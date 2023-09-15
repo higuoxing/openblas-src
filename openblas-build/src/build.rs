@@ -1,7 +1,7 @@
 //! Execute make of OpenBLAS, and its options
 
 use crate::{check::*, error::*};
-use std::{fs, path::*, process::Command, str::FromStr};
+use std::{env, fs, path::*, process::Command, str::FromStr};
 use walkdir::WalkDir;
 
 /// Interface for 32-bit interger (LP64) and 64-bit integer (ILP64)
@@ -389,7 +389,14 @@ impl Configure {
         //
         let out = fs::File::create(out_dir.join("out.log")).expect("Cannot create log file");
         let err = fs::File::create(out_dir.join("err.log")).expect("Cannot create log file");
-        match Command::new("make")
+        let mut make = Command::new("make");
+        match env::var("OPENBLAS_ARGS") {
+            Ok(args) => {
+                make.args(args.split_whitespace());
+            }
+            _ => (),
+        };
+        match make
             .current_dir(out_dir)
             .stdout(out)
             .stderr(err)
