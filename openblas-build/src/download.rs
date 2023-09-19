@@ -25,10 +25,36 @@ pub fn download(out_dir: &Path) -> Result<PathBuf> {
     Ok(dest)
 }
 
+fn try_proxy_from_env() -> Option<ureq::Proxy> {
+    macro_rules! try_env {
+            ($($env:literal),+) => {
+                $(
+                    if let Ok(env) = std::env::var($env) {
+                        if let Ok(proxy) = ureq::Proxy::new(env) {
+                            return Some(proxy);
+                        }
+                    }
+                )+
+            };
+        }
+
+    try_env!(
+        "ALL_PROXY",
+        "all_proxy",
+        "HTTPS_PROXY",
+        "https_proxy",
+        "HTTP_PROXY",
+        "http_proxy"
+    );
+    None
+}
+
 fn get_agent() -> ureq::Agent {
-    ureq::AgentBuilder::new()
-        .tls_connector(std::sync::Arc::new(
-            native_tls::TlsConnector::new().expect("failed to create TLS connector"),
-        ))
-        .build()
+    let mut agent_builder = ureq::AgentBuilder::new().tls_connector(std::sync::Arc::new(
+        native_tls::TlsConnector::new().expect("failed to create TLS connector"),
+    ));
+    if let Some(proxy) = try_proxy_from_env() {
+        agent_builder = agent_builder.proxy(proxy);
+    }
+    agent_builder.build()
 }
